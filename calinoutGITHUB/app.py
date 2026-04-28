@@ -3,17 +3,16 @@ import sys
 import os
 from datetime import date, timedelta
 
-# 1. Configuración de rutas para que Python encuentre tus archivos
+# Configuración de ruta absoluta para evitar el ModuleNotFoundError
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-# 2. Importación unificada (usando el nombre de tu archivo database.py)
+# Importación directa (sin el nombre de la carpeta)
 try:
     from database import get_connection
 except ImportError:
-    # Opción de respaldo para la estructura de Streamlit Cloud
-    from calinoutGITHUB.database import get_connection
+    st.error("No se pudo encontrar database.py. Asegúrate de que el archivo esté en la misma carpeta que app.py")
 
 # ... Aquí sigue el resto de tu código (título, pestañas, etc.) ...
 
