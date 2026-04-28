@@ -2,8 +2,8 @@ import mysql.connector
 import streamlit as st
 
 def get_connection():
-    """Conexión limpia usando los secretos de Streamlit Cloud."""
     try:
+        # Streamlit reemplazará estas palabras por tus datos reales automáticamente
         conexion = mysql.connector.connect(
             host=st.secrets["mysql"]["host"],
             port=int(st.secrets["mysql"]["port"]),
@@ -14,7 +14,7 @@ def get_connection():
         )
         return conexion
     except mysql.connector.Error as err:
-        st.error(f"Error de conexión a la base de datos: {err}")
+        st.error(f"Error al conectar a la base de datos: {err}")
         return None
 
 def ejecutar_query(query, params=(), fetch=False):
