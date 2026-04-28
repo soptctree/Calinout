@@ -1,8 +1,18 @@
+import streamlit as st
 import sys
 import os
 
-# Esto le dice a Python que busque archivos en la carpeta del proyecto
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# 1. Forzamos a Python a ver la carpeta interna
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+# 2. Ahora importamos con el nombre unificado
+try:
+    from database import get_connection
+except ImportError:
+    # Si falla lo anterior, intentamos importación relativa
+    from calinoutGITHUB.database import get_connection
 
 import streamlit as st
 from database import obtener_conexion # O el nombre exacto de tu función
