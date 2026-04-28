@@ -206,4 +206,4 @@ def render_tab_calendario(periodo, casas_seleccionadas):
             if "🛠️" in val: return 'background-color: #fff3cd; color: #856404;'
             return ''
 
-        st.dataframe(df_display.style.applymap(style_cells), use_container_width=True)
+        st.dataframe(df_display.style.map(style_cells), use_container_width=True)
