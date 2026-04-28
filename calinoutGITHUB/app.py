@@ -98,45 +98,69 @@ with st.sidebar:
     periodo_global = st.date_input("Periodo", value=[date.today(), date.today() + timedelta(days=7)])
 
 # --- PESTAÑAS POR ROL ---
-rol = st.session_state.rol
+# --- DENTRO DE LA PESTAÑA DE CONFIGURACIÓN (Solo para Admin) ---
 if rol == "admin":
-    tabs = st.tabs(["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📊 Auditoría", "📋 Inclusiones", "💰 Contabilidad", "⚙️ Configuración"])
-    with tabs[0]: render_tab_calendario(periodo_global, [])
-    with tabs[1]: render_tab_reservas()
-    with tabs[2]: render_tab_facturacion()
-    with tabs[3]: render_tab_auditoria()
-    with tabs[4]: render_tab_inclusiones()
-    with tabs[5]: render_tab_contabilidad()
-    with tabs[6]:
-        render_tab_configuracion()
-        
-        # --- CONSOLA DE USUARIOS (Lo que pediste) ---
-        st.divider()
-        st.header("👥 Gestión de Usuarios y Accesos")
-        
-        col_new, col_status = st.columns(2)
-        
-        with col_new:
-            st.subheader("Registrar Nuevo")
-            with st.form("form_new_user", clear_on_submit=True):
-                n_nom = st.text_input("Nombre Completo")
-                n_usr = st.text_input("ID de Usuario")
-                n_pwd = st.text_input("Contraseña", type="password")
-                n_rol = st.selectbox("Rol", ["admin", "agente", "contador"])
-                if st.form_submit_button("Guardar en Base de Datos"):
-                    if agregar_usuario_db(n_nom, n_usr, n_pwd, n_rol):
-                        st.success(f"Usuario {n_usr} creado correctamente.")
+    st.divider()
+    st.header("👥 Gestión de Usuarios y Accesos")
 
-        with col_status:
-            st.subheader("Bloquear / Activar")
-            target_user = st.text_input("ID de Usuario a modificar")
-            col_b1, col_b2 = st.columns(2)
-            if col_b1.button("🚫 Bloquear", use_container_width=True):
-                if cambiar_estado_usuario(target_user, 0):
-                    st.warning(f"Usuario {target_user} ha sido bloqueado.")
-            if col_b2.button("✅ Activar", use_container_width=True):
-                if cambiar_estado_usuario(target_user, 1):
-                    st.success(f"Usuario {target_user} activado.")
+    # 1. VISUALIZACIÓN DE USUARIOS ACTUALES
+    st.subheader("Usuarios Registrados en el Sistema")
+    try:
+        conn = get_connection()
+        # Traemos la lista actualizada de la base de datos
+        query_lista = "SELECT nombre_completo, usuario, rol, activo FROM usuarios"
+        import pandas as pd
+        df_usuarios = pd.read_sql(query_lista, conn)
+        conn.close()
+
+        # Mostramos la tabla con un formato limpio
+        st.dataframe(
+            df_usuarios.style.map(
+                lambda x: 'color: red;' if x == 0 else ('color: green;' if x == 1 else ''), 
+                subset=['activo']
+            ),
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Error al cargar la lista: {e}")
+
+    # 2. ACCIONES DE GESTIÓN
+    col_new, col_status = st.columns(2)
+    
+    with col_new:
+        st.subheader("➕ Registrar Nuevo")
+        with st.form("form_new_user", clear_on_submit=True):
+            n_nom = st.text_input("Nombre Completo")
+            n_usr = st.text_input("ID de Usuario (Login)")
+            n_pwd = st.text_input("Contraseña Inicial", type="password")
+            n_rol = st.selectbox("Asignar Rol", ["admin", "agente", "contador"])
+            if st.form_submit_button("Guardar en Base de Datos"):
+                if agregar_usuario_db(n_nom, n_usr, n_pwd, n_rol):
+                    st.success(f"Usuario {n_usr} creado. ¡Ya puede iniciar sesión!")
+                    st.rerun() # Recargamos para que aparezca en la tabla de arriba
+
+    with col_status:
+        st.subheader("🚫 Bloquear / ✅ Activar")
+        # Aquí usamos la lista de usuarios del DataFrame para el selector
+        if not df_usuarios.empty:
+            usuario_a_modificar = st.selectbox(
+                "Seleccione el usuario a modificar", 
+                options=df_usuarios['usuario'].tolist()
+            )
+            
+            # Verificamos el estado actual para mostrar el botón correcto
+            estado_actual = df_usuarios[df_usuarios['usuario'] == usuario_a_modificar]['activo'].values[0]
+            
+            if estado_actual == 1:
+                if st.button("🚫 Bloquear Acceso", use_container_width=True, type="primary"):
+                    if cambiar_estado_usuario(usuario_a_modificar, 0):
+                        st.warning(f"Usuario {usuario_a_modificar} bloqueado.")
+                        st.rerun()
+            else:
+                if st.button("✅ Activar Acceso", use_container_width=True):
+                    if cambiar_estado_usuario(usuario_a_modificar, 1):
+                        st.success(f"Usuario {usuario_a_modificar} activado.")
+                        st.rerun()
 
 elif rol == "contador":
     tabs = st.tabs(["🧾 Facturación", "📊 Auditoría", "💰 Contabilidad"])
