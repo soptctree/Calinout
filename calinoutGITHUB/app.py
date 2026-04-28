@@ -3,7 +3,7 @@ import sys
 import os
 from datetime import date, timedelta
 
-# 1. Configuración de página
+# 1. Configuración de página (DEBE SER LO PRIMERO)
 st.set_page_config(page_title="Calinout Pro", layout="wide")
 
 # 2. Configuración de rutas e importaciones
@@ -28,7 +28,7 @@ def validar_usuario(user, pw):
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
-        # EL BLOQUEO FUNCIONA AQUÍ: Solo entra si activo = 1
+        # Solo permite usuarios activos (activo = 1)
         query = "SELECT nombre_completo, rol FROM usuarios WHERE usuario = %s AND password = %s AND activo = 1"
         cursor.execute(query, (user, pw))
         resultado = cursor.fetchone()
@@ -58,13 +58,13 @@ if not st.session_state.autenticado:
                     st.error("Acceso denegado: Credenciales incorrectas o usuario bloqueado.")
     st.stop()
 
-# --- LÓGICA DE GESTIÓN DE USUARIOS (Solo para Admin) ---
-def agregar_usuario_db(nombre, user, pas, rol):
+# --- LÓGICA DE GESTIÓN DE USUARIOS (Funciones de DB) ---
+def agregar_usuario_db(nombre, user, pas, rol_asignado):
     try:
         conn = get_connection()
         cursor = conn.cursor()
         query = "INSERT INTO usuarios (nombre_completo, usuario, password, rol, activo) VALUES (%s, %s, %s, %s, 1)"
-        cursor.execute(query, (nombre, user, pas, rol))
+        cursor.execute(query, (nombre, user, pas, rol_asignado))
         conn.commit()
         conn.close()
         return True
@@ -88,86 +88,89 @@ def cambiar_estado_usuario(user, estado):
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🏨 Calinout Pro")
+    # Subheader con info del usuario real
     st.subheader(f"👤 {st.session_state.usuario_nombre}")
     st.caption(f"Perfil: {st.session_state.rol.upper()}")
+    
     if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
+    
     st.divider()
-    # Filtros temporales (mantener los que ya tenías)
     periodo_global = st.date_input("Periodo", value=[date.today(), date.today() + timedelta(days=7)])
 
+# --- CORRECCIÓN CLAVE: Definir 'rol' antes de los IF ---
+rol = st.session_state.rol 
+
 # --- PESTAÑAS POR ROL ---
-# --- DENTRO DE LA PESTAÑA DE CONFIGURACIÓN (Solo para Admin) ---
 if rol == "admin":
-    st.divider()
-    st.header("👥 Gestión de Usuarios y Accesos")
-
-    # 1. VISUALIZACIÓN DE USUARIOS ACTUALES
-    st.subheader("Usuarios Registrados en el Sistema")
-    try:
-        conn = get_connection()
-        # Traemos la lista actualizada de la base de datos
-        query_lista = "SELECT nombre_completo, usuario, rol, activo FROM usuarios"
-        import pandas as pd
-        df_usuarios = pd.read_sql(query_lista, conn)
-        conn.close()
-
-        # Mostramos la tabla con un formato limpio
-        st.dataframe(
-            df_usuarios.style.map(
-                lambda x: 'color: red;' if x == 0 else ('color: green;' if x == 1 else ''), 
-                subset=['activo']
-            ),
-            use_container_width=True
-        )
-    except Exception as e:
-        st.error(f"Error al cargar la lista: {e}")
-
-    # 2. ACCIONES DE GESTIÓN
-    col_new, col_status = st.columns(2)
+    nombres_tabs = ["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📊 Auditoría", "📋 Inclusiones", "💰 Contabilidad", "⚙️ Configuración"]
+    tabs = st.tabs(nombres_tabs)
     
-    with col_new:
-        st.subheader("➕ Registrar Nuevo")
-        with st.form("form_new_user", clear_on_submit=True):
-            n_nom = st.text_input("Nombre Completo")
-            n_usr = st.text_input("ID de Usuario (Login)")
-            n_pwd = st.text_input("Contraseña Inicial", type="password")
-            n_rol = st.selectbox("Asignar Rol", ["admin", "agente", "contador"])
-            if st.form_submit_button("Guardar en Base de Datos"):
-                if agregar_usuario_db(n_nom, n_usr, n_pwd, n_rol):
-                    st.success(f"Usuario {n_usr} creado. ¡Ya puede iniciar sesión!")
-                    st.rerun() # Recargamos para que aparezca en la tabla de arriba
+    with tabs[0]: render_tab_calendario(periodo_global, [])
+    with tabs[1]: render_tab_reservas()
+    with tabs[2]: render_tab_facturacion()
+    with tabs[3]: render_tab_auditoria()
+    with tabs[4]: render_tab_inclusiones()
+    with tabs[5]: render_tab_contabilidad()
+    with tabs[6]:
+        render_tab_configuracion()
+        
+        # --- CONSOLA DE GESTIÓN DE USUARIOS (Sincronizada con DB) ---
+        st.divider()
+        st.header("👥 Gestión de Usuarios y Accesos")
+        
+        # 1. Visualización
+        st.subheader("Usuarios Registrados en el Sistema")
+        try:
+            import pandas as pd
+            conn = get_connection()
+            df_usuarios = pd.read_sql("SELECT nombre_completo, usuario, rol, activo FROM usuarios", conn)
+            conn.close()
+            st.dataframe(df_usuarios, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error al cargar lista: {e}")
+            df_usuarios = pd.DataFrame()
 
-    with col_status:
-        st.subheader("🚫 Bloquear / ✅ Activar")
-        # Aquí usamos la lista de usuarios del DataFrame para el selector
-        if not df_usuarios.empty:
-            usuario_a_modificar = st.selectbox(
-                "Seleccione el usuario a modificar", 
-                options=df_usuarios['usuario'].tolist()
-            )
-            
-            # Verificamos el estado actual para mostrar el botón correcto
-            estado_actual = df_usuarios[df_usuarios['usuario'] == usuario_a_modificar]['activo'].values[0]
-            
-            if estado_actual == 1:
-                if st.button("🚫 Bloquear Acceso", use_container_width=True, type="primary"):
-                    if cambiar_estado_usuario(usuario_a_modificar, 0):
-                        st.warning(f"Usuario {usuario_a_modificar} bloqueado.")
+        # 2. Acciones
+        col_new, col_status = st.columns(2)
+        with col_new:
+            st.subheader("➕ Registrar Nuevo")
+            with st.form("form_new_user", clear_on_submit=True):
+                n_nom = st.text_input("Nombre Completo")
+                n_usr = st.text_input("ID Usuario")
+                n_pwd = st.text_input("Pass", type="password")
+                n_r = st.selectbox("Rol", ["admin", "agente", "contador"])
+                if st.form_submit_button("Guardar"):
+                    if agregar_usuario_db(n_nom, n_usr, n_pwd, n_r):
+                        st.success("Usuario creado")
                         st.rerun()
-            else:
-                if st.button("✅ Activar Acceso", use_container_width=True):
-                    if cambiar_estado_usuario(usuario_a_modificar, 1):
-                        st.success(f"Usuario {usuario_a_modificar} activado.")
-                        st.rerun()
+
+        with col_status:
+            st.subheader("🚫 Bloquear / ✅ Activar")
+            if not df_usuarios.empty:
+                u_sel = st.selectbox("Seleccionar Usuario", df_usuarios['usuario'].tolist())
+                # Lógica de botones para Activar/Desactivar
+                c1, c2 = st.columns(2)
+                if c1.button("🚫 Bloquear"):
+                    cambiar_estado_usuario(u_sel, 0)
+                    st.rerun()
+                if c2.button("✅ Activar"):
+                    cambiar_estado_usuario(u_sel, 1)
+                    st.rerun()
 
 elif rol == "contador":
     tabs = st.tabs(["🧾 Facturación", "📊 Auditoría", "💰 Contabilidad"])
-    # ... renderizados de contador ...
+    with tabs[0]: render_tab_facturacion()
+    with tabs[1]: render_tab_auditoria()
+    with tabs[2]: render_tab_contabilidad()
+
 else: # agente
     tabs = st.tabs(["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📋 Inclusiones"])
-    # ... renderizados de agente ...
+    with tabs[0]: render_tab_calendario(periodo_global, [])
+    with tabs[1]: render_tab_reservas()
+    with tabs[2]: render_tab_facturacion()
+    with tabs[3]: render_tab_inclusiones()
 #######XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX######################
 # --- PESTAÑAS PRINCIPALES (FUERA DEL SIDEBAR) ---
 #tab1, tab2, tab3, tab4, tab5,tab6 = st.tabs([
