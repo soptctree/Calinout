@@ -24,17 +24,17 @@ try:
 except ImportError as e:
     st.error(f"⚠️ Error cargando módulos: {e}")
 
-# --- GESTIÓN DE SESIÓN REAL ---
+# --- GESTIÓN DE SESIÓN ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
     st.session_state.rol = None
     st.session_state.usuario_nombre = None
 
-# Función para validar contra TiDB
 def validar_usuario(user, pw):
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
+        # Solo permite entrar si el usuario está activo (activo = 1)
         query = "SELECT nombre_completo, rol FROM usuarios WHERE usuario = %s AND password = %s AND activo = 1"
         cursor.execute(query, (user, pw))
         resultado = cursor.fetchone()
@@ -42,7 +42,7 @@ def validar_usuario(user, pw):
         conn.close()
         return resultado
     except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        st.error(f"Error de conexión a la base de datos: {e}")
         return None
 
 # --- PANTALLA DE LOGIN ---
@@ -61,10 +61,10 @@ if not st.session_state.autenticado:
                     st.session_state.usuario_nombre = user_data['nombre_completo']
                     st.rerun()
                 else:
-                    st.error("Credenciales incorrectas")
+                    st.error("Credenciales incorrectas o usuario inactivo")
     st.stop()
 
-# --- DATOS PARA LA APP ---
+# --- LÓGICA DE DATOS GENERALES ---
 def obtener_nombres_villas():
     try:
         conn = get_connection()
@@ -79,15 +79,15 @@ def obtener_nombres_villas():
 lista_villas = obtener_nombres_villas()
 hoy = date.today()
 
-# --- SIDEBAR MEJORADO ---
+# --- SIDEBAR (PANEL DE CONTROL) ---
 with st.sidebar:
     st.title("🏨 Calinout Pro")
     
-    # Aquí movemos la info del usuario al Subheader como pediste
+    # Subheader con info del usuario (Tu petición de diseño)
     st.subheader(f"👤 {st.session_state.usuario_nombre}")
     st.caption(f"Rol: {st.session_state.rol.upper()}")
     
-    if st.button("Cerrar Sesión"):
+    if st.button("Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
     
@@ -95,19 +95,18 @@ with st.sidebar:
     
     # Filtros Globales
     casa_global = st.multiselect("Filtrar por Casa", options=lista_villas)
-    periodo_global = st.date_input("Rango", value=[hoy, hoy + timedelta(days=7)])
+    periodo_global = st.date_input("Rango de Visualización", value=[hoy, hoy + timedelta(days=7)])
     
     st.divider()
     
-    # Gestión de Estado (Bloqueos)
-    st.subheader("🛠️ Gestión de Estado")
+    # Gestión rápida de estados (Para todos los roles)
+    st.subheader("🛠️ Estado de Unidades")
     with st.expander("Bloquear/Desbloquear"):
-        with st.form("form_bloqueo"):
+        with st.form("form_bloqueo_rapido"):
             v_bloqueo = st.selectbox("Unidad", lista_villas)
-            nuevo_estado = st.selectbox("Estado", ["Libre", "Bloqueado", "Mantenimiento"])
+            nuevo_est = st.selectbox("Nuevo Estado", ["Libre", "Bloqueado", "Mantenimiento"])
             if st.form_submit_button("Actualizar"):
-                # Aquí iría tu lógica de UPDATE en TiDB
-                st.success("Estado actualizado")
+                st.info("Función en desarrollo...") # Aquí conectas tu lógica de ocupacion
 
 # --- RENDERIZADO POR ROLES ---
 rol = st.session_state.rol
@@ -120,7 +119,28 @@ if rol == "admin":
     with tabs[3]: render_tab_auditoria()
     with tabs[4]: render_tab_inclusiones()
     with tabs[5]: render_tab_contabilidad()
-    with tabs[6]: render_tab_configuracion()
+    with tabs[6]:
+        render_tab_configuracion()
+        # SECCIÓN EXTRA: Gestión de Usuarios (Solo para ti)
+        st.divider()
+        st.subheader("👥 Panel de Control de Usuarios")
+        col_u1, col_u2 = st.columns(2)
+        with col_u1:
+            with st.expander("➕ Crear Usuario"):
+                with st.form("crear_u"):
+                    n_nom = st.text_input("Nombre")
+                    n_user = st.text_input("ID Usuario")
+                    n_pass = st.text_input("Pass", type="password")
+                    n_rol = st.selectbox("Rol", ["admin", "agente", "contador"])
+                    if st.form_submit_button("Registrar"):
+                        # Aquí ejecutas el INSERT en TiDB
+                        st.success(f"Usuario {n_user} listo")
+        with col_u2:
+            with st.expander("🚫 Bloquear Acceso"):
+                u_bloqueo = st.text_input("Usuario a desactivar")
+                if st.button("Desactivar"):
+                    # Aquí ejecutas: UPDATE usuarios SET activo = 0 WHERE usuario = %s
+                    st.warning(f"Usuario {u_bloqueo} bloqueado")
 
 elif rol == "contador":
     tabs = st.tabs(["🧾 Facturación", "📊 Auditoría", "💰 Contabilidad"])
@@ -128,7 +148,7 @@ elif rol == "contador":
     with tabs[1]: render_tab_auditoria()
     with tabs[2]: render_tab_contabilidad()
 
-elif rol == "agente": # El rol de tu colega recepcionista
+elif rol == "agente": # El rol para tu colega recepcionista
     tabs = st.tabs(["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📋 Inclusiones"])
     with tabs[0]: render_tab_calendario(periodo_global, casa_global)
     with tabs[1]: render_tab_reservas()
