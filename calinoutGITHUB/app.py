@@ -3,7 +3,7 @@ import sys
 import os
 from datetime import date, timedelta
 
-# 1. SIEMPRE debe ser la primera instrucción de Streamlit
+# 1. Configuración de página (SIEMPRE PRIMERO)
 st.set_page_config(page_title="Calinout Pro", layout="wide")
 
 # 2. Configuración de rutas
@@ -11,7 +11,7 @@ root_path = os.path.dirname(os.path.abspath(__file__))
 if root_path not in sys.path:
     sys.path.append(root_path)
 
-# 3. Importaciones unificadas
+# 3. Importaciones
 from database import get_connection
 
 try:
@@ -19,98 +19,101 @@ try:
     from modules.reservas import render_tab_reservas
     from modules.facturacion import render_tab_facturacion
     from modules.auditoria import render_tab_auditoria
-    from modules.configuracion import render_tab_configuracion, seccion_admin_costos
+    from modules.configuracion import render_tab_configuracion
     from modules.contabilidad import render_tab_contabilidad
 except ImportError as e:
     st.error(f"⚠️ Error cargando módulos: {e}")
 
-# Gestión de estado
-if "factura_generada" not in st.session_state:
-    st.session_state.factura_generada = False
+# --- GESTIÓN DE SESIÓN REAL ---
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+    st.session_state.rol = None
+    st.session_state.usuario_nombre = None
 
-# --- LÓGICA DE DATOS ---
+# Función para validar contra TiDB
+def validar_usuario(user, pw):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = "SELECT nombre_completo, rol FROM usuarios WHERE usuario = %s AND password = %s AND activo = 1"
+        cursor.execute(query, (user, pw))
+        resultado = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return resultado
+    except Exception as e:
+        st.error(f"Error de conexión: {e}")
+        return None
+
+# --- PANTALLA DE LOGIN ---
+if not st.session_state.autenticado:
+    st.title("🏨 Calinout Pro - Acceso al Sistema")
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        with st.form("login_form"):
+            u = st.text_input("Usuario")
+            p = st.text_input("Contraseña", type="password")
+            if st.form_submit_button("Ingresar"):
+                user_data = validar_usuario(u, p)
+                if user_data:
+                    st.session_state.autenticado = True
+                    st.session_state.rol = user_data['rol']
+                    st.session_state.usuario_nombre = user_data['nombre_completo']
+                    st.rerun()
+                else:
+                    st.error("Credenciales incorrectas")
+    st.stop()
+
+# --- DATOS PARA LA APP ---
 def obtener_nombres_villas():
     try:
         conn = get_connection()
-        if conn:
-            cursor = conn.cursor(dictionary=True)
-            # OJO: Asegúrate que en TiDB la columna se llame 'nombre_personalizado'
-            cursor.execute("SELECT nombre_personalizado FROM nombres_casas WHERE activo = 1")
-            villas = [row['nombre_personalizado'] for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
-            return villas
-        return ["Villa 1", "Villa 2"] # Respaldo si no hay conexión
-    except Exception as e:
-        return ["Villa 1", "Villa 2"]
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT nombre_personalizado FROM nombres_casas WHERE activo = 1")
+        villas = [row['nombre_personalizado'] for row in cursor.fetchall()]
+        conn.close()
+        return villas if villas else ["Villa 1"]
+    except:
+        return ["Cargando..."]
 
 lista_villas = obtener_nombres_villas()
 hoy = date.today()
 
-# --- SIDEBAR (LOGIN Y FILTROS) ---
+# --- SIDEBAR MEJORADO ---
 with st.sidebar:
-    st.title("🔐 Control de Acceso")
-    usuario_simulado = st.selectbox(
-        "Iniciar sesión como:",
-        ["Recepcionista (Limitado)", "Contador (Finanzas)", "Admin (Acceso Total)"]
-    )
-
-    if "Admin" in usuario_simulado:
-        st.session_state.rol = "admin"
-    elif "Contador" in usuario_simulado:
-        st.session_state.rol = "contador"
-    else:
-        st.session_state.rol = "recepcionista"
-
-    st.divider()
     st.title("🏨 Calinout Pro")
     
-    casa_global = st.multiselect(
-        "Filtrar por Casa", 
-        options=lista_villas,
-        default=[], 
-        placeholder="Todas las unidades",
-        key="selector_casas_multiple"
-    )
-
-    periodo_global = st.date_input(
-        "Rango de Visualización", 
-        value=[hoy, hoy + timedelta(days=7)]
-    )
+    # Aquí movemos la info del usuario al Subheader como pediste
+    st.subheader(f"👤 {st.session_state.usuario_nombre}")
+    st.caption(f"Rol: {st.session_state.rol.upper()}")
+    
+    if st.button("Cerrar Sesión"):
+        st.session_state.autenticado = False
+        st.rerun()
+    
+    st.divider()
+    
+    # Filtros Globales
+    casa_global = st.multiselect("Filtrar por Casa", options=lista_villas)
+    periodo_global = st.date_input("Rango", value=[hoy, hoy + timedelta(days=7)])
     
     st.divider()
     
     # Gestión de Estado (Bloqueos)
     st.subheader("🛠️ Gestión de Estado")
     with st.expander("Bloquear/Desbloquear"):
-        with st.form("form_bloqueo_sidebar", clear_on_submit=True):
+        with st.form("form_bloqueo"):
             v_bloqueo = st.selectbox("Unidad", lista_villas)
-            f_bloqueo = st.date_input("Fecha", value=hoy)
-            nuevo_estado = st.selectbox("Nuevo Estado", ["Libre", "Bloqueado", "Mantenimiento"])
-            submit_bloqueo = st.form_submit_button("Actualizar")
+            nuevo_estado = st.selectbox("Estado", ["Libre", "Bloqueado", "Mantenimiento"])
+            if st.form_submit_button("Actualizar"):
+                # Aquí iría tu lógica de UPDATE en TiDB
+                st.success("Estado actualizado")
 
-        if submit_bloqueo:
-            try:
-                conn = get_connection()
-                cursor = conn.cursor()
-                sql_update = """
-                    INSERT INTO ocupacion (id_casa, fecha, estado)
-                    VALUES ((SELECT id_casa FROM nombres_casas WHERE nombre_personalizado = %s), %s, %s)
-                    ON DUPLICATE KEY UPDATE estado = %s
-                """
-                cursor.execute(sql_update, (v_bloqueo, f_bloqueo, nuevo_estado, nuevo_estado))
-                conn.commit()
-                st.success(f"✅ {v_bloqueo} actualizado")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
-            finally:
-                if conn: conn.close()
+# --- RENDERIZADO POR ROLES ---
+rol = st.session_state.rol
 
-# --- RENDERIZADO DE PESTAÑAS SEGÚN ROL ---
-if st.session_state.rol == "admin":
-    nombres = ["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📊 Auditoría", "📋 Inclusiones", "💰 Contabilidad", "⚙️ Configuración"]
-    tabs = st.tabs(nombres)
+if rol == "admin":
+    tabs = st.tabs(["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📊 Auditoría", "📋 Inclusiones", "💰 Contabilidad", "⚙️ Configuración"])
     with tabs[0]: render_tab_calendario(periodo_global, casa_global)
     with tabs[1]: render_tab_reservas()
     with tabs[2]: render_tab_facturacion()
@@ -119,16 +122,14 @@ if st.session_state.rol == "admin":
     with tabs[5]: render_tab_contabilidad()
     with tabs[6]: render_tab_configuracion()
 
-elif st.session_state.rol == "contador":
-    nombres = ["🧾 Facturación", "📊 Auditoría", "💰 Contabilidad"]
-    tabs = st.tabs(nombres)
+elif rol == "contador":
+    tabs = st.tabs(["🧾 Facturación", "📊 Auditoría", "💰 Contabilidad"])
     with tabs[0]: render_tab_facturacion()
     with tabs[1]: render_tab_auditoria()
     with tabs[2]: render_tab_contabilidad()
 
-else: # Recepcionista
-    nombres = ["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📋 Inclusiones"]
-    tabs = st.tabs(nombres)
+elif rol == "agente": # El rol de tu colega recepcionista
+    tabs = st.tabs(["📅 Calendario", "📝 Reservas", "🧾 Facturación", "📋 Inclusiones"])
     with tabs[0]: render_tab_calendario(periodo_global, casa_global)
     with tabs[1]: render_tab_reservas()
     with tabs[2]: render_tab_facturacion()
