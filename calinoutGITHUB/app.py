@@ -8,19 +8,18 @@ root_path = os.path.dirname(os.path.abspath(__file__))
 if root_path not in sys.path:
     sys.path.append(root_path)
 
-# Importación única y limpia
+# Importaciones limpias
 from database import get_connection
 
-# Importaciones de módulos
-from modules.calendario import render_tab_calendario, render_tab_inclusiones
-from modules.reservas import render_tab_reservas
-from modules.facturacion import render_tab_facturacion
-from modules.auditoria import render_tab_auditoria
-from modules.configuracion import render_tab_configuracion, seccion_admin_costos
-from modules.contabilidad import render_tab_contabilidad
+try:
+    from modules.calendario import render_tab_calendario, render_tab_inclusiones
+    from modules.reservas import render_tab_reservas
+    from modules.facturacion import render_tab_facturacion
+    from modules.auditoria import render_tab_auditoria
+    from modules.configuracion import render_tab_configuracion, seccion_admin_costos
+    from modules.contabilidad import render_tab_contabilidad
 except ImportError as e:
-    st.error(f"Error de importación: {e}")
-    st.info("Asegúrate de que 'database.py' y la carpeta 'modules' estén en la misma carpeta que este app.py")
+    st.error(f"Error cargando módulos: {e}")
 
 # ... Aquí sigue el resto de tu código (título, pestañas, etc.) ...
 
