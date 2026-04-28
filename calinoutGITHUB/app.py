@@ -1,3 +1,11 @@
+import sys
+import os
+
+# Esto le dice a Python que busque archivos en la carpeta del proyecto
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+import streamlit as st
+from database import obtener_conexion # O el nombre exacto de tu función
 import streamlit as st
 from datetime import date, timedelta
 from database import get_connection
