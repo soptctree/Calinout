@@ -1,7 +1,7 @@
 import mysql.connector
 import streamlit as st
 
-def obtener_conexion():
+def get_connection():
     """Establece la conexión con la base de datos TiDB Cloud usando Secretos."""
     try:
         # Usamos st.secrets para conectar con la base de datos externa
