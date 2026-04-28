@@ -1,18 +1,30 @@
 import streamlit as st
 import sys
 import os
-from datetime import date, timedelta
 
-# Configuración de ruta absoluta para evitar el ModuleNotFoundError
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+# --- CONFIGURACIÓN DE RUTAS (ESTO ES LO MÁS IMPORTANTE) ---
+# Obtenemos la ruta de la carpeta donde está app.py (calinoutGITHUB)
+root_path = os.path.dirname(os.path.abspath(__file__))
 
-# Importación directa (sin el nombre de la carpeta)
+# Agregamos esa ruta al sistema para que todos los módulos la vean
+if root_path not in sys.path:
+    sys.path.append(root_path)
+
+# --- AHORA SÍ, IMPORTAMOS TODO ---
 try:
     from database import get_connection
-except ImportError:
-    st.error("No se pudo encontrar database.py. Asegúrate de que el archivo esté en la misma carpeta que app.py")
+    
+    # Importaciones de tus módulos
+    from modules.calendario import render_tab_calendario, render_tab_inclusiones
+    from modules.reservas import render_tab_reservas
+    from modules.facturacion import render_tab_facturacion
+    from modules.auditoria import render_tab_auditoria
+    from modules.configuracion import render_tab_configuracion, seccion_admin_costos
+    from modules.contabilidad import render_tab_contabilidad
+
+except ImportError as e:
+    st.error(f"Error de importación: {e}")
+    st.info("Asegúrate de que 'database.py' y la carpeta 'modules' estén en la misma carpeta que este app.py")
 
 # ... Aquí sigue el resto de tu código (título, pestañas, etc.) ...
 
