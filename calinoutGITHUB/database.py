@@ -1,20 +1,21 @@
 import mysql.connector
 import streamlit as st
 
-def get_connection():
-    """Establece la conexión con la base de datos MySQL."""
+def obtener_conexion():
+    """Establece la conexión con la base de datos TiDB Cloud usando Secretos."""
     try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="",
-            database="ocupacion_calinout"
+        # Usamos st.secrets para conectar con la base de datos externa
+        conexion = mysql.connector.connect(
+            host=st.secrets["mysql"]["gateway01.us-east-1.prod.aws.tidbcloud.com"],
+            port=st.secrets["mysql"]["4000"],
+            user=st.secrets["mysql"]["656ozEuuzyBjeL5.root"],
+            password=st.secrets["mysql"]["0VGZDnkyb6xY2xg8"],
+            database=st.secrets["mysql"]["sys"]
         )
-        return conn
-    except mysql.connector.Error as e:
-        st.error(f"Error al conectar a la base de datos: {e}")
+        return conexion
+    except mysql.connector.Error as mi:
+        st.error(f"Error al conectar a la base de datos: {mi}")
         return None
-
 def ejecutar_query(query, params=(), fetch=False):
     """
     Función utilitaria para ejecutar SQL de forma segura.
