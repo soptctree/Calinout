@@ -2,12 +2,11 @@ import mysql.connector
 import streamlit as st
 
 def get_connection():
-    """Conexión unificada a TiDB Cloud."""
+    """Conexión limpia usando los secretos de Streamlit Cloud."""
     try:
-        # IMPORTANTE: Usamos las llaves, no los valores reales aquí
         conexion = mysql.connector.connect(
             host=st.secrets["mysql"]["host"],
-            port=st.secrets["mysql"]["port"],
+            port=int(st.secrets["mysql"]["port"]),
             user=st.secrets["mysql"]["user"],
             password=st.secrets["mysql"]["password"],
             database=st.secrets["mysql"]["database"],
@@ -15,19 +14,21 @@ def get_connection():
         )
         return conexion
     except mysql.connector.Error as err:
-        st.error(f"Error de conexión: {err}")
+        st.error(f"Error de conexión a la base de datos: {err}")
         return None
+
 def ejecutar_query(query, params=(), fetch=False):
-    """Ejecuta SQL de forma segura."""
-    conn = obtener_conexion()
+    """Función utilitaria para ejecutar SQL de forma segura."""
+    conn = get_connection()
     if conn:
         try:
             cursor = conn.cursor(dictionary=True)
             cursor.execute(query, params)
-            return cursor.fetchall() if fetch else True
+            if fetch:
+                return cursor.fetchall()
+            return True
         except mysql.connector.Error as e:
-            st.error(f"Error en query: {e}")
+            st.error(f"Error en la consulta: {e}")
         finally:
             conn.close()
     return None
-    
