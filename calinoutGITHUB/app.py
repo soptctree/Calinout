@@ -1,27 +1,23 @@
 import streamlit as st
 import sys
 import os
+from datetime import date, timedelta
 
-# --- CONFIGURACIÓN DE RUTAS (ESTO ES LO MÁS IMPORTANTE) ---
-# Obtenemos la ruta de la carpeta donde está app.py (calinoutGITHUB)
+# Configuración de rutas
 root_path = os.path.dirname(os.path.abspath(__file__))
-
-# Agregamos esa ruta al sistema para que todos los módulos la vean
 if root_path not in sys.path:
     sys.path.append(root_path)
 
-# --- AHORA SÍ, IMPORTAMOS TODO ---
-try:
-    from database import get_connection
-    
-    # Importaciones de tus módulos
-    from modules.calendario import render_tab_calendario, render_tab_inclusiones
-    from modules.reservas import render_tab_reservas
-    from modules.facturacion import render_tab_facturacion
-    from modules.auditoria import render_tab_auditoria
-    from modules.configuracion import render_tab_configuracion, seccion_admin_costos
-    from modules.contabilidad import render_tab_contabilidad
+# Importación única y limpia
+from database import get_connection
 
+# Importaciones de módulos
+from modules.calendario import render_tab_calendario, render_tab_inclusiones
+from modules.reservas import render_tab_reservas
+from modules.facturacion import render_tab_facturacion
+from modules.auditoria import render_tab_auditoria
+from modules.configuracion import render_tab_configuracion, seccion_admin_costos
+from modules.contabilidad import render_tab_contabilidad
 except ImportError as e:
     st.error(f"Error de importación: {e}")
     st.info("Asegúrate de que 'database.py' y la carpeta 'modules' estén en la misma carpeta que este app.py")
