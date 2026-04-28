@@ -115,7 +115,7 @@ def render_tab_auditoria():
                 return ''
 
             st.dataframe(
-                df_det.style.applymap(resaltar_pagos, subset=['Estado'])
+                df_det.style.map(resaltar_pagos, subset=['Estado'])
                             .format({"Total": "${:,.2f}"}),
                 use_container_width=True, hide_index=True
             )
