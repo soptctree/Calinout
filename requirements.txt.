@@ -4,3 +4,4 @@ mysql-connector-python
 fpdf
 plotly
 fpdf2
+xlsxwriter
