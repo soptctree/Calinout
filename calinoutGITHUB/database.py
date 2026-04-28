@@ -1,42 +1,33 @@
 import mysql.connector
 import streamlit as st
 
-def get_connection():
-    """Establece la conexión con la base de datos TiDB Cloud usando Secretos."""
+def obtener_conexion():
+    """Conexión limpia usando los secretos de Streamlit Cloud."""
     try:
-        # Usamos st.secrets para conectar con la base de datos externa
         conexion = mysql.connector.connect(
-            host=st.secrets["mysql"]["gateway01.us-east-1.prod.aws.tidbcloud.com"],
-            port=st.secrets["mysql"]["4000"],
-            user=st.secrets["mysql"]["656ozEuuzyBjeL5.root"],
-            password=st.secrets["mysql"]["0VGZDnkyb6xY2xg8"],
-            database=st.secrets["mysql"]["sys"]
+            host=st.secrets["mysql"]["host"],
+            port=st.secrets["mysql"]["port"],
+            user=st.secrets["mysql"]["user"],
+            password=st.secrets["mysql"]["password"],
+            database=st.secrets["mysql"]["database"],
+            autocommit=True
         )
         return conexion
-    except mysql.connector.Error as mi:
-        st.error(f"Error al conectar a la base de datos: {mi}")
+    except mysql.connector.Error as err:
+        st.error(f"Error de conexión: {err}")
         return None
+
 def ejecutar_query(query, params=(), fetch=False):
-    """
-    Función utilitaria para ejecutar SQL de forma segura.
-    Si fetch=True, devuelve los resultados (SELECT).
-    Si fetch=False, hace commit (INSERT, UPDATE, DELETE).
-    """
-    conn = get_connection()
+    """Ejecuta SQL de forma segura."""
+    conn = obtener_conexion()
     if conn:
-        cursor = conn.cursor(dictionary=True, buffered=True)
         try:
+            cursor = conn.cursor(dictionary=True)
             cursor.execute(query, params)
-            if fetch:
-                resultado = cursor.fetchall()
-                return resultado
-            else:
-                conn.commit()
-                return True
-        except Exception as e:
-            st.error(f"Error ejecutando query: {e}")
-            return None
+            return cursor.fetchall() if fetch else True
+        except mysql.connector.Error as e:
+            st.error(f"Error en query: {e}")
         finally:
-            cursor.close()
             conn.close()
     return None
+    
