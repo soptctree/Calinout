@@ -1,24 +1,21 @@
 import streamlit as st
 import sys
 import os
+from datetime import date, timedelta
 
-# 1. Forzamos a Python a ver la carpeta interna
+# 1. Configuración de rutas para que Python encuentre tus archivos
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-# 2. Ahora importamos con el nombre unificado
+# 2. Importación unificada (usando el nombre de tu archivo database.py)
 try:
     from database import get_connection
 except ImportError:
-    # Si falla lo anterior, intentamos importación relativa
+    # Opción de respaldo para la estructura de Streamlit Cloud
     from calinoutGITHUB.database import get_connection
 
-import streamlit as st
-from database import obtener_conexion # O el nombre exacto de tu función
-import streamlit as st
-from datetime import date, timedelta
-from database import get_connection
+# ... Aquí sigue el resto de tu código (título, pestañas, etc.) ...
 
 if "factura_generada" not in st.session_state:
         st.session_state.factura_generada = False
