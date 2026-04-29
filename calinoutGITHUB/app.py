@@ -10,7 +10,7 @@ st.set_page_config(page_title="Calinout Pro", layout="wide")
 from database import get_connection
 try:
 
-    from modules.calendario import render_tab_calendar, render_tab_inclusiones
+    from modules.calendario import render_tab_calendario, render_tab_inclusiones
     from modules.reservas import render_tab_reservas
     from modules.facturacion import render_tab_facturacion
     from modules.auditoria import render_tab_auditoria
