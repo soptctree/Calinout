@@ -10,7 +10,7 @@ st.set_page_config(page_title="Calinout Pro", layout="wide")
 from database import get_connection
 
 try:
-    # IMPORTANTE: Aquí va con "o" al final para que coincida con tu módulo
+    # IMPORTANTE: Aquí usamos "calendario" con O porque así se llama en tu módulo
     from modules.calendario import render_tab_calendario, render_tab_inclusiones
     from modules.reservas import render_tab_reservas
     from modules.facturacion import render_tab_facturacion
