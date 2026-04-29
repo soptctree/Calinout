@@ -61,6 +61,7 @@ def render_tab_inclusiones():
         tot_ninos = df_llegadas['ninos'].sum() + df_encasa['ninos'].sum()
         pax_total = tot_adultos + tot_ninos
 
+        # Mostrar cuadro de resumen destacado
         st.success(f"☕ **Resumen para Alimentos y Bebidas:** El hotel abre con **{pax_total} Pax** ({tot_adultos} Adultos y {tot_ninos} Niños).")
 
         # --- DISEÑO DE PANTALLA ---
@@ -77,7 +78,7 @@ def render_tab_inclusiones():
 
         st.divider()
 
-        # --- EXPORTACIÓN A EXCEL ---
+        # --- EXPORTACIÓN A EXCEL CON CORRECCIÓN DE COLUMNAS ---
         st.subheader("📥 Descargar Reporte para Áreas")
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -87,107 +88,17 @@ def render_tab_inclusiones():
                 'Salidas': df_salidas,
                 'Villas_Libres': df_libres
             }
+            
             for nombre_hoja, df in hojas.items():
                 df.to_excel(writer, sheet_name=nombre_hoja, index=False)
                 worksheet = writer.sheets[nombre_hoja]
                 for idx, col in enumerate(df.columns):
-                    max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
-                    worksheet.set_column(idx, idx, max_len)
+                    if not df[col].empty:
+                        max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
+                        worksheet.set_column(idx, idx, max_len)
 
         st.download_button(
             label="📗 Descargar Reporte Operativo (XLSX)",
             data=output.getvalue(),
             file_name=f"Reporte_Operativo_{fecha_reporte}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
-
-    except Exception as e:
-        st.error(f"Error al generar inclusiones: {e}")
-
-def render_tab_calendario(periodo, casas_seleccionadas):
-    # --- VALIDACIÓN DE SEGURIDAD ---
-    if not periodo or len(periodo) < 2:
-        st.info("📅 Por favor, selecciona un rango de fechas (Inicio y Fin) en el panel lateral.")
-        return 
-    
-    fecha_inicio, fecha_fin = periodo
-
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        # 1. OBTENER LAS CASAS ACTIVAS
-        query_casas = "SELECT id_casa, nombre_personalizado FROM nombres_casas WHERE activo = 1"
-        if casas_seleccionadas:
-            formato_casas = "', '".join(casas_seleccionadas)
-            query_casas += f" AND nombre_personalizado IN ('{formato_casas}')"
-        
-        cursor.execute(query_casas)
-        rows_casas = cursor.fetchall()
-        nombres_villas = [r['nombre_personalizado'] for r in rows_casas]
-
-        # 2. CREAR EL RANGO DE FECHAS
-        rango_dias = pd.date_range(start=fecha_inicio, end=fecha_fin)
-        columnas_fechas = [d.strftime('%a %d/%m') for d in rango_dias]
-        mapeo_fechas = {d.strftime('%a %d/%m'): d.date() for d in rango_dias}
-
-        # 3. INICIALIZAR EL DATAFRAME VACÍO
-        df_display = pd.DataFrame("🟢 Libre", index=nombres_villas, columns=columnas_fechas)
-
-        # 4. LEER BLOQUEOS (Prioridad Baja)
-        query_bloqueos = """
-            SELECT n.nombre_personalizado, o.fecha, o.estado 
-            FROM ocupacion o
-            JOIN nombres_casas n ON o.id_casa = n.id_casa
-            WHERE o.fecha BETWEEN %s AND %s
-        """
-        cursor.execute(query_bloqueos, (fecha_inicio, fecha_fin))
-        for b in cursor.fetchall():
-            casa, f_str = b['nombre_personalizado'], b['fecha'].strftime('%a %d/%m')
-            if casa in df_display.index and f_str in df_display.columns:
-                df_display.at[casa, f_str] = "🔒 BLOQUEADO" if b['estado'] == "Bloqueado" else "🛠️ MANT"
-
-        # 5. LEER RESERVAS (Lógica corregida para evitar duplicados y permitir Turnover)
-        query_reservas = """
-            SELECT r.nombre_huesped, n.nombre_personalizado, r.fecha_entrada, r.fecha_salida 
-            FROM reservas r
-            JOIN nombres_casas n ON r.id_casa = n.id_casa
-            WHERE r.fecha_salida > %s AND r.fecha_entrada <= %s
-        """
-        cursor.execute(query_reservas, (fecha_inicio, fecha_fin))
-        reservas = cursor.fetchall()
-
-        for res in reservas:
-            casa = res['nombre_personalizado']
-            if casa in df_display.index:
-                for col in columnas_fechas:
-                    f_actual = mapeo_fechas[col]
-                    nombre = res['nombre_huesped'].split()[0]
-                    
-                    # Lógica de asignación inteligente
-                    if f_actual == res['fecha_entrada']:
-                        val_actual = df_display.at[casa, col]
-                        # Si ya hay una salida (🛫) marcada ese día, es un cambio de turno
-                        df_display.at[casa, col] = f"🔄 Sal/Ent" if "🛫" in val_actual else f"🛬 {nombre}"
-                    
-                    elif f_actual == res['fecha_salida']:
-                        val_actual = df_display.at[casa, col]
-                        # Si ya hay una entrada (🛬) marcada ese día, es un cambio de turno
-                        df_display.at[casa, col] = f"🔄 Sal/Ent" if "🛬" in val_actual else f"🛫 {nombre}"
-                        
-                    elif res['fecha_entrada'] < f_actual < res['fecha_salida']:
-                        df_display.at[casa, col] = f"🔴 {nombre}"
-
-    except Exception as e:
-        st.error(f"Error en calendario: {e}")
-    finally:
-        if 'conn' in locals() and conn.is_connected():
-            cursor.close()
-            conn.close()
-
-    # --- RENDERIZADO CON COLORES MEJORADOS ---
-    if not df_display.empty:
-        def style_cells(val):
-            if "🟢" in val: return 'background-color: #e8f5e9; color: #2e7d32;'
-            if "🔴" in val: return 'background-color: #fff9c4; color:
