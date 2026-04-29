@@ -132,7 +132,7 @@ def generar_pdf_factura(datos):
         "- Check-in 2:00 PM / Check-out 11:00 AM.\n"
         "- Respetar el silencio despues de las 10:00 PM.\n"
         "- No se permite musica con alto volumen en areas comunes.\n"
-       "- Cancelaciones: Menos de 48 horas no aplica reembolso."
+        "- Cancelaciones: Menos de 48 horas no aplica reembolso."
     ))
     return pdf.output()
 
