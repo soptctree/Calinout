@@ -8,17 +8,18 @@ st.set_page_config(page_title="Calinout Pro", layout="wide")
 
 # 2. Configuración de rutas e importaciones
 from database import get_connection
-try:
 
+try:
+    # IMPORTANTE: Aquí va con "o" al final para que coincida con tu módulo
     from modules.calendario import render_tab_calendario, render_tab_inclusiones
     from modules.reservas import render_tab_reservas
     from modules.facturacion import render_tab_facturacion
     from modules.auditoria import render_tab_auditoria
     from modules.configuracion import render_tab_configuracion
     from modules.contabilidad import render_tab_contabilidad
-except ImportError as e:
+except Exception as e:
     st.error(f"⚠️ Error cargando módulos: {e}")
-
+    
 # --- GESTIÓN DE SESIÓN ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
