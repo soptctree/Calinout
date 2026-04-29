@@ -136,7 +136,8 @@ def generar_pdf_factura(datos):
     ))
 
     # .encode('latin-1', 'replace') para evitar errores con caracteres especiales
-    return pdf.output(dest='S').encode('latin-1', errors='replace')
+    pdf_output = pdf.output()
+    return bytes(pdf_output) if isinstance(pdf_output, bytearray) else pdf_output.encode('latin-1', errors='replace')
 
 def render_tab_facturacion():
     st.header("🧾 Módulo de Facturación Pro")
