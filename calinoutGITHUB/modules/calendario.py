@@ -57,12 +57,10 @@ def render_tab_inclusiones():
         conn.close()
 
         # --- CÁLCULO DE RESUMEN PARA COCINA (PAX TOTAL) ---
-        # Sumamos adultos y niños de los que llegan y los que ya están
         tot_adultos = df_llegadas['adultos'].sum() + df_encasa['adultos'].sum()
         tot_ninos = df_llegadas['ninos'].sum() + df_encasa['ninos'].sum()
         pax_total = tot_adultos + tot_ninos
 
-        # Mostrar cuadro de resumen destacado
         st.success(f"☕ **Resumen para Alimentos y Bebidas:** El hotel abre con **{pax_total} Pax** ({tot_adultos} Adultos y {tot_ninos} Niños).")
 
         # --- DISEÑO DE PANTALLA ---
@@ -79,21 +77,18 @@ def render_tab_inclusiones():
 
         st.divider()
 
-        # --- EXPORTACIÓN A EXCEL CON CORRECCIÓN DE COLUMNAS ---
+        # --- EXPORTACIÓN A EXCEL ---
         st.subheader("📥 Descargar Reporte para Áreas")
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            # Diccionario de hojas para iterar y corregir
             hojas = {
                 'Llegadas': df_llegadas,
                 'Huespedes_En_Casa': df_encasa,
                 'Salidas': df_salidas,
                 'Villas_Libres': df_libres
             }
-            
             for nombre_hoja, df in hojas.items():
                 df.to_excel(writer, sheet_name=nombre_hoja, index=False)
-                # CORRECCIÓN DE CAPTURA: Ajustar ancho para evitar los "#######"
                 worksheet = writer.sheets[nombre_hoja]
                 for idx, col in enumerate(df.columns):
                     max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
@@ -153,8 +148,7 @@ def render_tab_calendario(periodo, casas_seleccionadas):
             if casa in df_display.index and f_str in df_display.columns:
                 df_display.at[casa, f_str] = "🔒 BLOQUEADO" if b['estado'] == "Bloqueado" else "🛠️ MANT"
 
-        # 5. LEER RESERVAS (Prioridad Alta - Evita duplicados)
-        # Ajustamos la lógica para que no traiga reservas que terminan el día que inicia el reporte
+        # 5. LEER RESERVAS (Lógica corregida para evitar duplicados y permitir Turnover)
         query_reservas = """
             SELECT r.nombre_huesped, n.nombre_personalizado, r.fecha_entrada, r.fecha_salida 
             FROM reservas r
@@ -171,14 +165,15 @@ def render_tab_calendario(periodo, casas_seleccionadas):
                     f_actual = mapeo_fechas[col]
                     nombre = res['nombre_huesped'].split()[0]
                     
-                    # Lógica de asignación sin sobreescribir erróneamente:
+                    # Lógica de asignación inteligente
                     if f_actual == res['fecha_entrada']:
-                        # Si ya hay algo (como una salida), marcar como cambio de turno
                         val_actual = df_display.at[casa, col]
+                        # Si ya hay una salida (🛫) marcada ese día, es un cambio de turno
                         df_display.at[casa, col] = f"🔄 Sal/Ent" if "🛫" in val_actual else f"🛬 {nombre}"
                     
                     elif f_actual == res['fecha_salida']:
                         val_actual = df_display.at[casa, col]
+                        # Si ya hay una entrada (🛬) marcada ese día, es un cambio de turno
                         df_display.at[casa, col] = f"🔄 Sal/Ent" if "🛬" in val_actual else f"🛫 {nombre}"
                         
                     elif res['fecha_entrada'] < f_actual < res['fecha_salida']:
@@ -191,15 +186,8 @@ def render_tab_calendario(periodo, casas_seleccionadas):
             cursor.close()
             conn.close()
 
-    # --- RENDERIZADO ---
+    # --- RENDERIZADO CON COLORES MEJORADOS ---
     if not df_display.empty:
         def style_cells(val):
             if "🟢" in val: return 'background-color: #e8f5e9; color: #2e7d32;'
-            if "🔴" in val: return 'background-color: #fff9c4; color: #b71c1c;' # Amarillo suave para ocupado
-            if "🛬" in val: return 'background-color: #e3f2fd; color: #0d47a1; font-weight: bold;' # Azul entrada
-            if "🛫" in val: return 'background-color: #fce4ec; color: #880e4f; font-weight: bold;' # Rosa salida
-            if "🔄" in val: return 'background-color: #f3e5f5; color: #4a148c; border: 1px solid purple;' # Cambio turno
-            if "🔒" in val or "🛠️" in val: return 'background-color: #eeeeee; color: #424242;'
-            return ''
-
-        st.dataframe(df_display.style.map(style_cells), use_container_width=True)
+            if "🔴" in val: return 'background-color: #fff9c4; color:
