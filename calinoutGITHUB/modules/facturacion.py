@@ -132,10 +132,8 @@ def generar_pdf_factura(datos):
         "- Check-in 2:00 PM / Check-out 11:00 AM.\n"
         "- Respetar el silencio despues de las 10:00 PM.\n"
         "- No se permite musica con alto volumen en areas comunes.\n"
-        "- Cancelaciones: Menos de 48 horas no aplica reembolso."
+       "- Cancelaciones: Menos de 48 horas no aplica reembolso."
     ))
-
-    # CORRECCIÓN AQUÍ: Se eliminó el .encode('latin-1') que causaba el error en Python 3.14
     return pdf.output()
 
 def render_tab_facturacion():
